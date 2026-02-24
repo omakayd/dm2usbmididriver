@@ -2,7 +2,7 @@
 	DM2USBMIDI.h
 	By : Joe Mattiello
 
-	Based upon: SampleUSBMIDI.h © Copyright 2005 Apple Computer, Inc.
+	Based upon: SampleUSBMIDI.h ï¿½ Copyright 2005 Apple Computer, Inc.
 	
 =============================================================================*/
 
@@ -11,8 +11,6 @@
 
 #include "USBVendorMIDIDriver.h"
 #include "DM2 Structs.h"
-#include <Growl/GrowlApplicationBridge-Carbon.h>
-#include <Growl/GrowlDefines.h>
 
 // --------------------- ** PRE-PROC DEFINES ** ----------------------------//
 
@@ -98,21 +96,6 @@ public:
 	
 	struct MIDITimeStamps timeStamps;
 	
-	//Growl, it's loaded dynamically from inside the bundle so we're using function pointers since normal linking won't work
-	// The reason it won't work you ask? Well we're a dynamic bundle being loaded from MIDIServer, and therefor can't link to, 
-	// and then dynamically load our own bundles correctly in version of OS X below 10.4, which used to be our target.
-	// TODO: upgrade the following to more sane methods supported by 10.4, @loader_path instead of @executable_path
-	// see: http://growl.info/documentation/developer/implementing-growl.php?lang=cocoa
-	
-	struct Growl_Delegate growlDelegate;
-	typedef Boolean (*Growl_SetDelegate)(struct Growl_Delegate *);
-	typedef void	(*Growl_Notify)(CFStringRef,CFStringRef,CFStringRef,CFDataRef,signed int,Boolean,CFPropertyListRef);
-	
-	Growl_SetDelegate MyGrowl_SetDelegate;
-	Growl_Notify	MyGrowl_Notify;
-	bool enableGrowl;
-	bool hasGrowl;
-	//End Growl
 	
 	void createNote(struct Button * button, Byte * noteBuf);
 
@@ -159,14 +142,10 @@ public:
 };
 //Non-member function
 void notifyCallback(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo);
-void LoadGrowlBundle (CFBundleRef *bundlePtr);
 
 //inline functions
 //TODO:maybe grab some of these and make them STATIC, will that save performacne, espcailly calcRatio and calcSliderValue
-inline const static double 
-#ifdef __LITTLE_ENDIAN__
-__attribute__((fastcall)) //makes the values passed by register rather than stack 
-#endif
+inline const static double
 calcRatio(int x, int y)
 {
 	return 127.0 / (double) abs(x-y);

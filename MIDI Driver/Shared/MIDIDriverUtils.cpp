@@ -1,4 +1,4 @@
-/*	Copyright © 2007 Apple Inc. All Rights Reserved.
+/*	Copyright ï¿½ 2007 Apple Inc. All Rights Reserved.
 	
 	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
 			Apple Inc. ("Apple") in consideration of your agreement to the
@@ -71,9 +71,7 @@ void	IOBuffer::Allocate(void *owner, UInt32 size)
 // _________________________________________________________________________________________
 
 #if DEBUG
-// Dynamically look up DebugAssert so we don't have to link against CoreServices
-// just for it.
-#include <mach-o/dyld.h>
+#include <dlfcn.h>
 
 extern "C" void DebugAssert(
 					OSType        componentSignature,
@@ -88,10 +86,10 @@ extern "C" void DebugAssert(
 	typedef void (*DAProc)(OSType, UInt32, const char *, const char *, const char *, const char *, long, void *);
 	static DAProc realDAProc = NULL;
 	if (realDAProc == NULL)
-		realDAProc = (DAProc)NSAddressOfSymbol(NSLookupAndBindSymbolWithHint("_DebugAssert", "CoreServices"));
+		realDAProc = (DAProc)dlsym(RTLD_DEFAULT, "DebugAssert");
 	if (realDAProc)
 		(*realDAProc)(componentSignature, options, assertionString, exceptionString, errorString, fileName, lineNumber, value);
 	else
-		*(long *)0 = 0;	// bus error
+		__builtin_trap();
 }
 #endif

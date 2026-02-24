@@ -10,7 +10,7 @@
 #ifndef __TraktorEQConfiguration_h__
 #define __TraktorEQConfiguration_h__
 
-#include <Carbon/Carbon.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include "TraktorConfiguration.h"
 
 class DM2USBMIDIDriver;

@@ -112,9 +112,6 @@ void TraktorConfiguration::bottom1Clicked(DM2USBMIDIDriver * dm2){
 		return;}
 	else if(dm2->status.bottom_1 == 0)
 	{
-		if(dm2->hasGrowl)
-			dm2->MyGrowl_Notify(CFSTR("Traktor Mode Change"),CFSTR("Mixing Mode"),CFSTR("Traktor Mode Change"),NULL,0,FALSE,NULL);
-		
 		DM2Configuration::bottom1Clicked(dm2); // Changes currentBank
 		currentMode = traktorMixMode;
 	
@@ -128,9 +125,6 @@ void TraktorConfiguration::bottom2Clicked(DM2USBMIDIDriver * dm2){
 		return;}
 	else if(dm2->status.bottom_2 == 0)
 	{
-		if(dm2->hasGrowl)
-			dm2->MyGrowl_Notify(CFSTR("Traktor Mode Change"),CFSTR("Loop Mode"),CFSTR("Traktor Mode Change"),NULL,0,FALSE,NULL);
-		
 		DM2Configuration::bottom2Clicked(dm2);
 		currentMode = traktorLoopMode;
 	}
@@ -142,9 +136,6 @@ void TraktorConfiguration::bottom3Clicked(DM2USBMIDIDriver * dm2){
 		return;}
 	else if(dm2->status.bottom_3 == 0)
 	{
-		if(dm2->hasGrowl)
-			dm2->MyGrowl_Notify(CFSTR("Traktor Mode Change"),CFSTR("FX Mode"),CFSTR("Traktor Mode Change"),NULL,0,FALSE,NULL);
-
 		DM2Configuration::bottom3Clicked(dm2);
 		currentMode = traktorFXMode;
 	}
@@ -157,9 +148,6 @@ void TraktorConfiguration::bottom4Clicked(DM2USBMIDIDriver * dm2){
 		return;}
 	else if(dm2->status.bottom_4 == 0)
 	{
-		if(dm2->hasGrowl)
-			dm2->MyGrowl_Notify(CFSTR("Traktor Mode Change"),CFSTR("EQ Mode"),CFSTR("Traktor Mode Change"),NULL,0,FALSE,NULL);
-
 		DM2Configuration::bottom4Clicked(dm2);
 		currentMode = traktorEQMode;
 	}

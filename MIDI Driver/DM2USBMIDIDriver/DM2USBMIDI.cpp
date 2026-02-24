@@ -59,6 +59,22 @@ Maybes::
 
 //#include <iostream>
 //using namespace std;
+
+// _________________________________________________________________________________________
+// dm2WriteLEDData — sends 4-byte LED packet to the DM2.
+//
+// The DM2's OUT endpoint (addr=0x02) is incorrectly declared as Bulk (attr=0x02)
+// in the device descriptor, but the DM2 is a low-speed USB device. xHCI host
+// controllers (Apple Silicon) refuse to create bulk endpoints for low-speed devices
+// per the USB spec, so WritePipe fails with kIOUSBUnknownPipeErr on those systems.
+// LED output is unavailable on xHCI; MIDI input works normally.
+//
+static IOReturn dm2WriteLEDData(IOUSBInterfaceInterface **intf, void *buffer, UInt32 size)
+{
+	if (intf == NULL || *intf == NULL) return kIOReturnNotReady;
+	return (*intf)->WritePipe(intf, 2, buffer, size);
+}
+
 // ____________________ ** C EXTERN ** _________________________________________//
 
 
@@ -227,30 +243,25 @@ void		DM2USBMIDIDriver::StartInterface(USBMIDIDevice *usbmDev)
 	IOUSBInterfaceInterface ** intf =  usbmDev->mUSBIntfIntf;
 	GusbmDev = usbmDev;
 	IOReturn ioreturn;
-	
+
+	if (intf == NULL || *intf == NULL)
+		return;
+
+	// Blink LEDs on startup (may fail silently on xHCI/Apple Silicon
+	// due to the DM2's spec-violating bulk endpoint on a low-speed device)
 	for(int x = 0; x<5;x++)
 	{
 		bzero(buffer, sizeof(buffer));
-		
+
 		*((uint16_t *) buffer + 1) = 0xFFFF;
 		*((uint16_t *) buffer ) =  x%2 ? 0xFFFF : 0x0000;
 		*((uint16_t *) buffer ) = HostToUSBWord( *((uint16_t *) buffer ) );
-		ioreturn = (*intf)->WritePipe(intf, 2, buffer, strlen(buffer));
-		
+		ioreturn = dm2WriteLEDData(intf, buffer, 4);
+
 		if (ioreturn != kIOReturnSuccess)
-		{
-			printf("unable to do bulk write (%08x) Line:%i\n", ioreturn, __LINE__ );
-			(void) (*intf)->USBInterfaceClose(intf);
-			(void) (*intf)->Release(intf);
-		}
+			break;
 		usleep(100000);
-	//	struct timespec sleeptime;
-		
-	//	sleeptime.tv_sec = 100; //argument is supplied in milliseconds
-		
-	//	sleeptime.tv_nsec = 0; 
-	//	nanosleep(&sleeptime, NULL);
-	}	
+	}
 
 	readSettings();
 	resetMIDIClock();
@@ -265,51 +276,6 @@ void		DM2USBMIDIDriver::StartInterface(USBMIDIDevice *usbmDev)
 									appID, 
 									CFNotificationSuspensionBehaviorDeliverImmediately);
 	
-	//GROWL
-	hasGrowl = false;
-	if(enableGrowl)
-	{
-		CFBundleRef growlBundle;
-		LoadGrowlBundle(&growlBundle);
-		hasGrowl = CFBundleIsExecutableLoaded(growlBundle);
-	
-		if(hasGrowl)
-		{
-			// Create & fill the array containing the notifications
-			CFMutableArrayRef allNotifications = CFArrayCreateMutable(
-																	  kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
-			CFArrayAppendValue(allNotifications, CFSTR("Driver Loaded"));
-			CFArrayAppendValue(allNotifications, CFSTR("Traktor Mode Change"));
-			
-			// Create & fill the array containing the notifications that are turned
-			// on by default.
-			CFMutableArrayRef defaultNotifications = CFArrayCreateMutable(
-																		  kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
-			CFArrayAppendValue(defaultNotifications, CFSTR("Traktor Mode Change"));
-			
-			InitGrowlDelegate(&growlDelegate);
-			growlDelegate.applicationName = CFSTR("MixMan DM2");
-			//growlDelegate.applicationIconData = CFDataCreate(kCFAllocatorDefault, /*values*/ NULL, /*numValues*/ 0, &kCFTypeArrayCallBacks);
-			CFTypeRef keys[] = { GROWL_NOTIFICATIONS_ALL, GROWL_NOTIFICATIONS_DEFAULT };
-			CFTypeRef values[] = { allNotifications, defaultNotifications };
-			growlDelegate.registrationDictionary = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 2,
-																	  &kCFTypeDictionaryKeyCallBacks,
-																	  &kCFTypeDictionaryValueCallBacks);
-
-
-			MyGrowl_SetDelegate = (Growl_SetDelegate) CFBundleGetFunctionPointerForName(growlBundle,CFSTR("Growl_SetDelegate"));
-			MyGrowl_Notify = (Growl_Notify) CFBundleGetFunctionPointerForName(growlBundle,CFSTR("Growl_NotifyWithTitleDescriptionNameIconPriorityStickyClickContext"));
-			#if defined ( __i386__ )
-			//We seem to be throwing a random bus error only when using growl and running under Rosetta
-			// and only on Deployment mode
-			// TODO: test Growl on a real PPC system
-			
-			MyGrowl_SetDelegate(&growlDelegate);
-			#endif
-			MyGrowl_Notify(CFSTR("MixMan DM2"),CFSTR("Driver Loaded"),CFSTR("Driver Loaded"),NULL,0,FALSE,NULL);
-
-		}
-	}		//END GROWL
 
 }
 void DM2USBMIDIDriver::resetInterface()
@@ -331,11 +297,11 @@ void		DM2USBMIDIDriver::StopInterface(USBMIDIDevice *usbmDev)
 	//TODO: Call super here? 
 	
 	// Clear LEDs
-	IOReturn ioreturn;	
 	IOUSBInterfaceInterface ** intf =  usbmDev->mUSBIntfIntf;
-	char buffer[2] = {0xFF, 0xFF};
-	
-	ioreturn = (*intf)->WritePipe(intf, 2, buffer, strlen(buffer));
+	if (intf != NULL && *intf != NULL) {
+		unsigned char buffer[4] = {0xFF, 0xFF, 0x00, 0x00};
+		dm2WriteLEDData(intf, (void *)buffer, 4);
+	}
 }
 
 void		DM2USBMIDIDriver::HandleInput(USBMIDIDevice *usbmDev, MIDITimeStamp when, Byte *readBuf, ByteCount readBufSize)
@@ -686,10 +652,10 @@ bool DM2USBMIDIDriver::bitCheck(Byte byt,int bit)
 }
 
 void DM2USBMIDIDriver::sendLights(USBMIDIDevice *usbmDev)
-{	
+{
 	char buffer[16];
-	IOReturn ioreturn;
 	IOUSBInterfaceInterface ** intf = usbmDev->mUSBIntfIntf;
+	if (intf == NULL || *intf == NULL) return;
 
 	bzero(buffer, sizeof(buffer));
 	*((uint16_t *) buffer + 1) = 0xFFFF;
@@ -699,7 +665,7 @@ void DM2USBMIDIDriver::sendLights(USBMIDIDevice *usbmDev)
 								(currentConfig->currentBank->leds.right_5 << 3) +
 								(currentConfig->currentBank->leds.right_4 << 4) +
 								(currentConfig->currentBank->leds.right_3 << 5) +
-								(currentConfig->currentBank->leds.right_2 << 6) + 
+								(currentConfig->currentBank->leds.right_2 << 6) +
 								(currentConfig->currentBank->leds.right_1 << 7) +
 								(currentConfig->currentBank->leds.left_8 << 8) +
 								(currentConfig->currentBank->leds.left_7 << 9) +
@@ -707,72 +673,27 @@ void DM2USBMIDIDriver::sendLights(USBMIDIDevice *usbmDev)
 								(currentConfig->currentBank->leds.left_5 << 11) +
 								(currentConfig->currentBank->leds.left_4 << 12) +
 								(currentConfig->currentBank->leds.left_3 << 13) +
-								(currentConfig->currentBank->leds.left_2 << 14) + 
+								(currentConfig->currentBank->leds.left_2 << 14) +
 								(currentConfig->currentBank->leds.left_1 << 15);
 
-
-	
-	
 	*((uint16_t *) buffer ) = HostToUSBWord( *((uint16_t *) buffer ) );
-	
-	ioreturn = (*intf)->WritePipe(intf, 2, buffer, 4);
-	//ioreturn = (*intf)->WritePipeAsync(intf, 2, buffer, strlen(buffer), NULL, (void *) usbmDev);
-	
-	if (ioreturn != kIOReturnSuccess)
-	{
-		printf("unable to do bulk write (%08x) Line:%i\n", ioreturn, __LINE__ );
-		(void) (*intf)->USBInterfaceClose(intf);
-		(void) (*intf)->Release(intf);
-	}
-	#ifdef DEBUG_WRITE
-	else
-		printf("Wrote \"%4X\" (%ld bytes) to bulk endpoint\n", buffer[0], (UInt32) strlen(buffer));
-	#endif
+
+	dm2WriteLEDData(intf, buffer, 4);
 }
 
 void DM2USBMIDIDriver::sendLights(USBMIDIDevice *usbmDev,uint16_t * ledStatus)
-{		
+{
 	char buffer[16];
-	IOReturn ioreturn;
 	IOUSBInterfaceInterface ** intf = usbmDev->mUSBIntfIntf;
-	
+	if (intf == NULL || *intf == NULL) return;
+
 	bzero(buffer, sizeof(buffer));
 	*((uint16_t *) buffer + 1) = 0xFFFF;
-/*	*((uint16_t *) buffer ) =	(currentConfig->currentBank->leds.right_8) +
-								(currentConfig->currentBank->leds.right_7 << 1) +
-								(currentConfig->currentBank->leds.right_6 << 2) +
-								(currentConfig->currentBank->leds.right_5 << 3) +
-								(currentConfig->currentBank->leds.right_4 << 4) +
-								(currentConfig->currentBank->leds.right_3 << 5) +
-								(currentConfig->currentBank->leds.right_2 << 6) + 
-								(currentConfig->currentBank->leds.right_1 << 7) +
-								(currentConfig->currentBank->leds.left_8 << 8) +
-								(currentConfig->currentBank->leds.left_7 << 9) +
-								(currentConfig->currentBank->leds.left_6 << 10) +
-								(currentConfig->currentBank->leds.left_5 << 11) +
-								(currentConfig->currentBank->leds.left_4 << 12) +
-								(currentConfig->currentBank->leds.left_3 << 13) +
-								(currentConfig->currentBank->leds.left_2 << 14) + 
-								(currentConfig->currentBank->leds.left_1 << 15);
-*/	
 	*((uint16_t *) buffer ) = *ledStatus;
-	
-	
+
 	*((uint16_t *) buffer ) = HostToUSBWord( *((uint16_t *) buffer ) );
-	
-	ioreturn = (*intf)->WritePipe(intf, 2, buffer, 4);
-	//ioreturn = (*intf)->WritePipeAsync(intf, 2, buffer, strlen(buffer), NULL, (void *) usbmDev);
-	
-	if (ioreturn != kIOReturnSuccess)
-	{
-		printf("unable to do bulk write (%08x) Line:%i\n", ioreturn, __LINE__ );
-		(void) (*intf)->USBInterfaceClose(intf);
-		(void) (*intf)->Release(intf);
-	}
-#ifdef DEBUG_WRITE
-	else
-		printf("Wrote \"%4X\" (%ld bytes) to bulk endpoint\n", buffer[0], (UInt32) strlen(buffer));
-#endif
+
+	dm2WriteLEDData(intf, buffer, 4);
 }
 
 void DM2USBMIDIDriver::sendLights()
@@ -809,13 +730,6 @@ void DM2USBMIDIDriver::readSettings()
 		midiClockResolution = (CFStringRef) rtn;
 	else
 		midiClockResolution = CFSTR("16th");
-	/** Growl **/
-	rtn = CFPreferencesCopyAppValue( CFSTR("growlSupport"), appID );
-	if(rtn != NULL)
-		enableGrowl = CFBooleanGetValue((CFBooleanRef) rtn);
-	else
-		enableGrowl = false;
-	
 	currentConfig->readSettings();
 	
 #ifdef DEBUG
@@ -1213,30 +1127,3 @@ void notifyCallback(CFNotificationCenterRef center, void *observer, CFStringRef 
 		printf("Unknown Notificaiton Received\n");
 }
 
-void LoadGrowlBundle (CFBundleRef *bundlePtr)                
-{
-    CFURLRef    baseURL     = NULL;
-    CFURLRef    bundleURL   = NULL;
-	
-    if ( bundlePtr == NULL ) goto Bail;
-    *bundlePtr = NULL;
-	
-	bundleURL = CFURLCreateWithFileSystemPath(
-											  kCFAllocatorDefault,
-											  CFSTR("/Library/Audio/MIDI Drivers/DM2USBMIDIDriver.plugin/Contents/Frameworks/Growl.Framework"),
-											  kCFURLPOSIXPathStyle,
-											  true );
-	if ( bundleURL == NULL ) goto Bail;
-	*bundlePtr = CFBundleCreate(kCFAllocatorDefault,bundleURL);
-	if ( *bundlePtr == NULL ) goto Bail;
-
-    if ( ! CFBundleLoadExecutable (*bundlePtr) )                        
-    {
-		CFRelease (*bundlePtr);
-        *bundlePtr = NULL;
-    }
-
-Bail:
-	if ( bundleURL != NULL ) CFRelease (bundleURL);                     
-    if ( baseURL != NULL ) CFRelease (baseURL);                        
-}

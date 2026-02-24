@@ -10,7 +10,7 @@
 #ifndef __TraktorConfiguration_h__
 #define __TraktorConfiguration_h__
 
-#include <Carbon/Carbon.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include "DM2Configuration.h"
 
 class DM2USBMIDIDriver;

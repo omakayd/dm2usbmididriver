@@ -1,4 +1,4 @@
-/*	Copyright © 2007 Apple Inc. All Rights Reserved.
+/*	Copyright ï¿½ 2007 Apple Inc. All Rights Reserved.
 	
 	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
 			Apple Inc. ("Apple") in consideration of your agreement to the
@@ -41,7 +41,9 @@
 #ifndef __IOServiceClient_h__
 #define __IOServiceClient_h__
 
-#include <CoreServices/CoreServices.h>	// we need Debugging.h, CF, etc.
+#include <CoreFoundation/CoreFoundation.h>
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 1
+#include <AssertMacros.h>
 #include <IOKit/IOKitLib.h>
 
 // _________________________________________________________________________________________

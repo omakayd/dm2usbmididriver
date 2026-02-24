@@ -1,4 +1,4 @@
-/*	Copyright © 2007 Apple Inc. All Rights Reserved.
+/*	Copyright ï¿½ 2007 Apple Inc. All Rights Reserved.
 	
 	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
 			Apple Inc. ("Apple") in consideration of your agreement to the
@@ -102,11 +102,11 @@ bool	USBMIDIDevice::Initialize()
 #endif
 	
 	SetUpEndpoints(true);
-	
+
 	{
 		CFRunLoopRef ioRunLoop = MIDIGetDriverIORunLoop();
 		CFRunLoopSourceRef source;
-		
+
 		if (ioRunLoop != NULL) {
 			source = (*mUSBIntfIntf)->GetInterfaceAsyncEventSource(mUSBIntfIntf);
 			if (source == NULL) {
@@ -230,16 +230,16 @@ USBMIDIDevice::~USBMIDIDevice()
 //  Default implementation here just finds the last pipe of each direction.
 void	USBMIDIDevice::FindPipes()
 {
-	UInt8	   		numEndpoints = 0;	//, pipeNum, direction, transferType, interval;
-	UInt16			pipeIndex;			//, maxPacketSize; 		
-	
+	UInt8	   		numEndpoints = 0;
+	UInt16			pipeIndex;
+
 	numEndpoints = 0;
 	require_noerr((*mUSBIntfIntf)->GetNumEndpoints(mUSBIntfIntf, &numEndpoints), errexit);
-		// find the number of endpoints for this interface
 
 	for (pipeIndex = 1; pipeIndex <= numEndpoints; ++pipeIndex) {
 		USBPipe pipe;
-		require_noerr(mUSBInterface->GetPipe(pipeIndex, pipe), nextPipe);
+		IOReturn err = mUSBInterface->GetPipe(pipeIndex, pipe);
+		if (err != kIOReturnSuccess) goto nextPipe;
 		if (pipe.mDirection == kUSBOut)
 			mOutPipe = pipe;
 		else if (pipe.mDirection == kUSBIn)

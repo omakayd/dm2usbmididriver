@@ -6,8 +6,9 @@
  *  Copyright 2007 Joe Mattiello. All rights reserved.
  *
  */
-#include <CoreServices/CoreServices.h>
-#include "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/CarbonCore.framework/Versions/A/Headers/DriverServices.h"
+#include <CoreFoundation/CoreFoundation.h>
+#include <mach/mach_time.h>
+#include "DriverServicesCompat.h"
 #include "TraktorEQMode.h"
 #include "DM2USBMIDI.h"
 

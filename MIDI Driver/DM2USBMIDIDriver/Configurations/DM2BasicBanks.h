@@ -20,7 +20,7 @@
 #ifndef __DM2BasicNoBanks_h__
 #define __DM2BasicNoBanks_h__
 
-#include <Carbon/Carbon.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include "DM2Configuration.h"
 
 class DM2USBMIDIDriver;

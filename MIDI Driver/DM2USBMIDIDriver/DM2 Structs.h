@@ -10,6 +10,7 @@
 #define __DM2_Structs_h__
 
 #include <CoreMIDI/CoreMIDI.h>
+#include "DriverServicesCompat.h"
 
 /*** START TRAKTOR ***/
 #pragma mark -

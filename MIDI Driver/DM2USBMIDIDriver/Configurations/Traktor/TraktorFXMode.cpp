@@ -9,6 +9,7 @@
 
 #include "TraktorFXMode.h"
 #include "DM2USBMIDI.h"
+#include "DriverServicesCompat.h"
 /*
 -FX Mode / NO scratching
 	LEDS for FX buttons should be controlled via MIDI IN, set in .tks file, don't do anything here

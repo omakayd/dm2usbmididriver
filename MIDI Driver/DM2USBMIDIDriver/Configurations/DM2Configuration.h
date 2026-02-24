@@ -61,7 +61,7 @@
 #ifndef __DM2Configuration_h__
 #define __DM2Configuration_h__
 
-#include <Carbon/Carbon.h>
+#include <CoreFoundation/CoreFoundation.h>
 
 
 # define makeBasicNotePacket(a,b,c) dm2->noteBuf[0] = a;\

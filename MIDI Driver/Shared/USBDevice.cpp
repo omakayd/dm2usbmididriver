@@ -1,4 +1,4 @@
-/*	Copyright © 2007 Apple Inc. All Rights Reserved.
+/*	Copyright ï¿½ 2007 Apple Inc. All Rights Reserved.
 	
 	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
 			Apple Inc. ("Apple") in consideration of your agreement to the
@@ -448,13 +448,21 @@ USBInterface::~USBInterface()
 bool	USBInterface::Open()
 {
 	if (mIsOpen) return true;
-	
+
 	IOUSBInterfaceInterface **intfIntf = GetPluginInterface();
 	if (intfIntf == NULL) return false;
-	
+
 	require_noerr((*intfIntf)->USBInterfaceOpen(intfIntf), errexit);
+	mIsOpen = true;
+
+	// Reinitialize the pipe table by setting alternate interface 0.
+	// On modern macOS (especially Apple Silicon), the pipe table may not be
+	// fully populated until SetAlternateInterface is called, even for the
+	// default alternate setting 0.
+	(*intfIntf)->SetAlternateInterface(intfIntf, 0);
+
 	return true;
-	
+
 errexit:
 	return false;
 }

@@ -1,5 +1,16 @@
 # AGENT_NOTES (newest first)
 
+## 2026-09-24 Released v1.2.0 (settings app + driver fixes)
+
+- User tested the settings app ("everything I've tested so far works") and asked to push and release. Commit 4d5d19e on master.
+- Release: https://github.com/omakayd/dm2usbmididriver/releases/tag/v1.2.0, asset DM2-USB-MIDI-Driver-v1.2.0.zip (copy in
+  Releases/): DM2USBMIDIDriver.plugin, DM2LEDFix.kext, DM2 Settings.app, LED_CONTROL.md, README.md. Plugin and app are
+  universal, minos 11.0, and codesign -v passes after extraction. The app was rebuilt from committed sources before packaging.
+- Not verified by the user yet: dark mode appearance, "Generic MIDI with Banks" mode. The app is ad-hoc signed and not
+  notarized (first launch: right-click, Open).
+- Docs updated: LED_CONTROL.md (status, app, settings table with ScratchRingBumpIgnore and 32nd), README (Settings app
+  section, install step, structure, changes), CLAUDE.md status.
+
 ## 2026-09-24 DM2 Settings app built; awaiting user test (then ship v1.2.0: app + driver fixes)
 
 - Source: `DM2 Settings/` = Sources/{DM2SettingsApp,DriverSettings,DeviceStatus}.swift, Info.plist (com.omakayd.DM2Settings,

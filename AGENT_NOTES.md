@@ -9,6 +9,7 @@
   LED_CONTROL release-zip note. Scrubbed name and team ID from these notes and project.yml (repo is PUBLIC).
 - .gitignore: generated DriverKit app/xcodeproj, **/xcuserdata, workspace, Releases/, dm2_manual.pdf (copyrighted).
 - Release zip: Releases/DM2-USB-MIDI-Driver-v1.1.0.zip = plugin + DM2LEDFix.kext + LED_CONTROL.md + README.md.
+- DONE: commit ce9eefa pushed to origin master; gh release v1.1.0 published with the zip (verified: sigs valid after extract).
 
 ## 2026-09-24 User confirms LEDs work in the real driver; random-lit-pads-at-attach bug fixed (user-confirmed)
 

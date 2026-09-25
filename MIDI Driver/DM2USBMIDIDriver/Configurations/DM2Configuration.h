@@ -139,6 +139,7 @@ public:
 	void makeCCNote(int channel, int controlNumber, int value, DM2USBMIDIDriver * dm2); 
 	
 	virtual void readSettings();
+	void readBankSettings(struct Bank * bank);
 
 	virtual void clearLEDAllBanks();
 	void clearLEDBank(struct Bank *);

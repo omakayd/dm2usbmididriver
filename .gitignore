@@ -27,3 +27,6 @@ Releases/
 
 # Copyrighted reference material
 dm2_manual.pdf
+
+# Local test copy of the built plugin
+Test Build/

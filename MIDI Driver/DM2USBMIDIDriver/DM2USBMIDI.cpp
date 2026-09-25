@@ -106,6 +106,7 @@ DM2USBMIDIDriver::DM2USBMIDIDriver() :
 		bzero(&oldstatus, sizeof(oldstatus));
 		haveBaseline = false;
 		softwareMode = CFSTR("Generic MIDI");
+		midiClockResolution = CFSTR("16th");
 		
 		genericConfigWithBanks	= new DM2Configuration();
 		genericConfigNoBanks	= new DM2BasicNoBanks();
@@ -723,19 +724,32 @@ void DM2USBMIDIDriver::sendLights()
 	sendLights(GusbmDev);
 }
 
+/* Returns the constant from `allowed` that matches the stored string, or `fallback`.
+   The results are compile-time constants, so they never need releasing and stay valid
+   while PrepareOutput (MIDI clock) reads them on another thread. */
+static CFStringRef readChoice(CFStringRef key, const CFStringRef * allowed, int count, CFStringRef fallback)
+{
+	CFStringRef result = fallback;
+	CFPropertyListRef rtn = CFPreferencesCopyAppValue(key, appID);
+	if(rtn != NULL && CFGetTypeID(rtn) == CFStringGetTypeID())
+	{
+		for(int i = 0; i < count; i++)
+			if(CFStringCompare((CFStringRef) rtn, allowed[i], 0) == kCFCompareEqualTo)
+				result = allowed[i];
+	}
+	if(rtn)
+		CFRelease(rtn);
+	return result;
+}
+
 void DM2USBMIDIDriver::readSettings()
 {
 #ifdef DEBUG
 	printf("Read Settings\n");
 #endif
-	CFPropertyListRef rtn;
-	
 	/** Software Mode **/
-	rtn = CFPreferencesCopyAppValue( CFSTR("softwareMode"), appID );
-	if(rtn != NULL)
-		softwareMode = (CFStringRef) rtn;
-	else
-		softwareMode = CFSTR("Generic MIDI");
+	static const CFStringRef modes[] = { CFSTR("Generic MIDI"), CFSTR("Generic MIDI with Banks"), CFSTR("Mixxx"), CFSTR("Traktor") };
+	softwareMode = readChoice(CFSTR("softwareMode"), modes, 4, CFSTR("Generic MIDI"));
 	
 	if(CFStringCompare(softwareMode, CFSTR("Mixxx"),0) == 0)
 		currentConfig = mixxxConfig;
@@ -747,20 +761,14 @@ void DM2USBMIDIDriver::readSettings()
 		currentConfig = genericConfigNoBanks;
 	
 	/** MIDI Clock Resolution */
-	rtn = CFPreferencesCopyAppValue( CFSTR("midiClockResolution"), appID );
-	if(rtn != NULL)
-		midiClockResolution = (CFStringRef) rtn;
-	else
-		midiClockResolution = CFSTR("16th");
+	static const CFStringRef resolutions[] = { CFSTR("16th"), CFSTR("32nd"), CFSTR("1/4") };
+	midiClockResolution = readChoice(CFSTR("midiClockResolution"), resolutions, 3, CFSTR("16th"));
+	
 	currentConfig->readSettings();
 	
 #ifdef DEBUG
 	printf("Software Mode: %s\n",CFStringGetCStringPtr(softwareMode,0));
 #endif
-	
-	if(rtn)
-		CFRelease(rtn);
-
 }
 
 void DM2USBMIDIDriver::show(CFStringRef formatString, ...) {

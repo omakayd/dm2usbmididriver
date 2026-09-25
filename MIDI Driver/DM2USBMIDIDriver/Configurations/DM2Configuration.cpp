@@ -12,10 +12,10 @@
 #include "Macros.h"
 DM2Configuration::DM2Configuration()
 {
-	bank1 = new struct Bank;
-	bank2 = new struct Bank;
-	bank3 = new struct Bank;
-	bank4 = new struct Bank;
+	bank1 = new struct Bank();
+	bank2 = new struct Bank();
+	bank3 = new struct Bank();
+	bank4 = new struct Bank();
 	
 	bank1->bankNumber = 1;
 	bank2->bankNumber = 2;
@@ -476,11 +476,15 @@ void DM2Configuration::buttonReceived(int number, Bank * bank, int value, bool o
 	if(bank->midiInControlsLeds)
 	{	
 		/* An 'On' with 0 velocity is reall an 'Off' */
-		if(onMessage & value == 0)
+		if(onMessage && value == 0)
 			onMessage = false;
 		
+		/* ledStatus() returns the raw bit, where ON is FALSE (see setLED), so convert it
+		   to "is lit" before comparing, or Note On/Off act backwards */
+		bool isLit = bank->invertLeds ? ledStatus(number, bank) : !ledStatus(number, bank);
+
 		/* Toggle the led only if the received msg is opposite of current status */
-		if( onMessage != ledStatus(number, bank) )
+		if( onMessage != isLit )
 		{
 		   toggleLED(number,bank);
 			/* If the button status matters, ie; using sticky/toggle buttons we should set this to match */
@@ -855,149 +859,76 @@ bool DM2Configuration::getLEDbuttonStatusByNumber(int buttonNumber, struct Bank 
 
 
 
-void DM2Configuration::readSettings()
-{	
-	CFPropertyListRef rtn;
+/* Settings are stored per bank as bank<N><Name> in the appID preferences domain.
+   CFPreferencesGetApp*Value accept booleans, numbers and strings, so a value written
+   with the wrong type (for example by `defaults write`) cannot crash the driver. */
+static CFStringRef copyBankKey(int bankNumber, CFStringRef name)
+{
+	return CFStringCreateWithFormat(kCFAllocatorDefault, NULL, CFSTR("bank%d%@"), bankNumber, name);
+}
+
+static bool readBankBool(int bankNumber, CFStringRef name, bool fallback)
+{
+	CFStringRef key = copyBankKey(bankNumber, name);
+	Boolean valid = false;
+	Boolean value = CFPreferencesGetAppBooleanValue(key, appID, &valid);
+	CFRelease(key);
+	return valid ? value : fallback;
+}
+
+static int readBankInt(int bankNumber, CFStringRef name, int fallback)
+{
+	CFStringRef key = copyBankKey(bankNumber, name);
+	Boolean valid = false;
+	CFIndex value = CFPreferencesGetAppIntegerValue(key, appID, &valid);
+	CFRelease(key);
+	return valid ? (int)value : fallback;
+}
+
+void DM2Configuration::readBankSettings(struct Bank * bank)
+{
+	if(bank == NULL)
+		return;
+	int n = bank->bankNumber;
 	
-	// Read the preference, default for CFPreferencesGetAppBooleanValue is false if not found
+	bank->sticky_buttons	= readBankBool(n, CFSTR("StickyButtons"), false);
+	bank->invertLeds		= readBankBool(n, CFSTR("InvertLeds"), false);
+	bank->isMidiClock		= readBankBool(n, CFSTR("DisplaysMIDIClock"), false);
 	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1StickyButtons"), appID );
-	if(rtn != NULL)
-		bank1->sticky_buttons = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank1->sticky_buttons = false;
-	}
+	bank->bumpIgnore = readBankInt(n, CFSTR("ScratchRingBumpIgnore"), 0);
+	if(bank->bumpIgnore < 0)
+		bank->bumpIgnore = 0;
 	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank2StickyButtons"), appID );
-	if(rtn != NULL)
-		bank2->sticky_buttons = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank2->sticky_buttons = false;
-	}
+	/* Who Controls LEDs: "Driver Only" is the default, also for unknown values */
+	bank->midiInControlsLeds = FALSE;
+	bank->iControlLeds = TRUE;
 	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank3StickyButtons"), appID );
-	if(rtn != NULL)
-		bank3->sticky_buttons = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank3->sticky_buttons = false;
-	}
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank4StickyButtons"), appID );
-	if(rtn != NULL)
-		bank4->sticky_buttons = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank4->sticky_buttons = false;
-	}
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1InvertLeds"), appID );
-	if(rtn != NULL)
-		bank1->invertLeds = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank1->invertLeds = false;
-	}
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank2InvertLeds"), appID );
-	if(rtn != NULL)
-		bank2->invertLeds = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank2->invertLeds = false;
-	}
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank3InvertLeds"), appID );
-	if(rtn != NULL)
-		bank3->invertLeds = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank3->invertLeds = false;
-	}
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank4InvertLeds"), appID );
-	if(rtn != NULL)
-		bank4->invertLeds = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank4->invertLeds = false;
-	}
-	/** MIDI Display **/
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1DisplaysMIDIClock"), appID );
-	if(rtn != NULL)
-		bank1->isMidiClock = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank1->isMidiClock = false;
-	}
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank2DisplaysMIDIClock"), appID );
-	if(rtn != NULL)
-		bank2->isMidiClock = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank2->isMidiClock = false;
-	}
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank3DisplaysMIDIClock"), appID );
-	if(rtn != NULL)
-		bank3->isMidiClock = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank3->isMidiClock = false;
-	}
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank4DisplaysMIDIClock"), appID );
-	if(rtn != NULL)
-		bank4->isMidiClock = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank4->isMidiClock = false;
-	}
-	/* Bump Ignore */
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1ScratchRingBumpIgnore"), appID );
-	if(rtn != NULL)
-		CFNumberGetValue( (CFNumberRef) rtn, kCFNumberIntType, &(bank1->bumpIgnore));
-	else
-		bank1->bumpIgnore = 0;
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank2ScratchRingBumpIgnore"), appID );
-	if(rtn != NULL)
-		CFNumberGetValue( (CFNumberRef) rtn, kCFNumberIntType, &(bank2->bumpIgnore));
-	else
-		bank2->bumpIgnore = 0;
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank3ScratchRingBumpIgnore"), appID );
-	if(rtn != NULL)
-		CFNumberGetValue( (CFNumberRef) rtn, kCFNumberIntType, &(bank3->bumpIgnore));
-	else
-		bank3->bumpIgnore = 0;
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank4ScratchRingBumpIgnore"), appID );
-	if(rtn != NULL)
-		CFNumberGetValue( (CFNumberRef) rtn, kCFNumberIntType, &(bank4->bumpIgnore));
-	else
-		bank4->bumpIgnore = 0;
-	
-	/* Who Controls LEDs */
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1WhoControlsLEDs"), appID );
-	if(rtn != NULL)
+	CFStringRef key = copyBankKey(n, CFSTR("WhoControlsLEDs"));
+	CFPropertyListRef rtn = CFPreferencesCopyAppValue(key, appID);
+	CFRelease(key);
+	if(rtn != NULL && CFGetTypeID(rtn) == CFStringGetTypeID())
 	{
-	
 		if		( CFStringCompare((CFStringRef) rtn, CFSTR("MIDI Messages Only"), kCFCompareCaseInsensitive) == kCFCompareEqualTo )
 		{
-			bank1->midiInControlsLeds = TRUE;
-			bank1->iControlLeds = FALSE;
+			bank->midiInControlsLeds = TRUE;
+			bank->iControlLeds = FALSE;
 		}
 		else if ( CFStringCompare((CFStringRef) rtn, CFSTR("Driver & MIDI Messages"), kCFCompareCaseInsensitive) == kCFCompareEqualTo )
 		{
-			bank1->midiInControlsLeds = TRUE;
-			bank1->iControlLeds = TRUE;
-		}
-		else /* "Driver Only" or default for unknown values */
-		{
-			bank1->midiInControlsLeds = FALSE;
-			bank1->iControlLeds = TRUE;
+			bank->midiInControlsLeds = TRUE;
+			bank->iControlLeds = TRUE;
 		}
 	}
-	else
-	{
-		bank1->midiInControlsLeds = FALSE;
-		bank1->iControlLeds = TRUE;
-	}
-	
 	if(rtn)
 		CFRelease(rtn);
+}
+
+void DM2Configuration::readSettings()
+{
+	readBankSettings(bank1);
+	readBankSettings(bank2);
+	readBankSettings(bank3);
+	readBankSettings(bank4);
 }
 
 bool DM2Configuration::ledStatus(int ledNum, struct Bank * theBank)

@@ -12,13 +12,10 @@
 #include "DM2 Structs.h"
 
 DM2BasicNoBanks::DM2BasicNoBanks() : DM2Configuration()
-{	
-	/* Delete unused Bank structs */
-	delete bank2;
-	delete bank3;
-	delete bank4;
-	
-	bank2 = bank3 = bank4 = NULL;
+{
+	/* Only bank1 is used. bank2-4 stay allocated (from the base class) because
+	   PrepareOutput still routes incoming notes 16-63 to them; those notes then
+	   change nothing that is displayed. */
 }
 
 
@@ -46,60 +43,6 @@ void DM2BasicNoBanks::clearLEDAllBanks()
 }
 
 void DM2BasicNoBanks::readSettings()
-{	
-	CFPropertyListRef rtn;
-	
-	// Read the preference, default for CFPreferencesGetAppBooleanValue is false if not found
-	
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1StickyButtons"), appID );
-	if(rtn != NULL)
-		bank1->sticky_buttons = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank1->sticky_buttons = false;
-	}
-	
-		/** MIDI Display **/
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1DisplaysMIDIClock"), appID );
-	if(rtn != NULL)
-		bank1->isMidiClock = CFBooleanGetValue( (CFBooleanRef) rtn);
-	else {
-		bank1->isMidiClock = false;
-	}
-	
-		/* Bump Ignore */
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1ScratchRingBumpIgnore"), appID );
-	if(rtn != NULL)
-		CFNumberGetValue( (CFNumberRef) rtn, kCFNumberIntType, &(bank1->bumpIgnore));
-	else
-		bank1->bumpIgnore = 0;
-	
-		/* Who Controls LEDs */
-	rtn = CFPreferencesCopyAppValue( CFSTR("bank1WhoControlsLEDs"), appID );
-	if(rtn != NULL)
-	{
-	
-		if		( CFStringCompare((CFStringRef) rtn, CFSTR("MIDI Messages Only"), kCFCompareCaseInsensitive) == kCFCompareEqualTo )
-		{
-			bank1->midiInControlsLeds = TRUE;
-			bank1->iControlLeds = FALSE;
-		}
-		else if ( CFStringCompare((CFStringRef) rtn, CFSTR("Driver & MIDI Messages"), kCFCompareCaseInsensitive) == kCFCompareEqualTo )
-		{
-			bank1->midiInControlsLeds = TRUE;
-			bank1->iControlLeds = TRUE;
-		}
-		else /* "Driver Only" or default for unknown values */
-		{
-			bank1->midiInControlsLeds = FALSE;
-			bank1->iControlLeds = TRUE;
-		}
-	}
-	else
-	{
-		bank1->midiInControlsLeds = FALSE;
-		bank1->iControlLeds = TRUE;
-	}
-	
-	if(rtn)
-		CFRelease(rtn);
+{
+	readBankSettings(bank1);
 }

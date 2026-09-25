@@ -2,9 +2,10 @@
 
 How to make the Mixman DM2's 16 pad LEDs work on a modern Mac, and how an app can take control of them. It covers both setup and app-driven control, such as latching and momentary pads.
 
-**Status (2026-09-24, Apple Silicon M5, macOS 26.5.2):**
-- Verified on hardware: LEDs work with the fix installed, including the startup blink and pad presses toggling their LEDs ("Driver Only" mode).
-- Not yet verified on hardware: LEDs controlled by MIDI from an app ("MIDI Messages Only" mode). That part is described from the driver source code.
+**Status (2026-09-24, Apple Silicon M5, macOS 26.5.2):** verified on hardware.
+- LEDs work with the fix installed: startup blink, and pad presses toggling their LEDs ("Driver Only" mode).
+- LEDs controlled by MIDI from an app ("MIDI Messages Only" mode), tested with FL Studio: Note On lights a pad, Note Off turns it off. This needs driver v1.2.0 or later; v1.1.0 had Note On and Note Off reversed.
+- All settings can be changed with the **DM2 Settings** app (v1.2.0 and later), so Terminal is optional.
 
 ---
 
@@ -83,13 +84,15 @@ The driver has a per-bank setting that decides what changes the LEDs:
 
 For app-defined behavior (latching, momentary, status lights), use **`MIDI Messages Only`**. With `Driver & MIDI Messages`, the driver and your app would both flip the same LED on every press.
 
-Set it from Terminal:
+The easiest way to change it is the **DM2 Settings** app: under "Pads and LEDs", set "LEDs follow" to *MIDI from apps*. The change applies immediately.
+
+Or set it from Terminal:
 
 ```
 defaults write com.joemattiello.driver.dm2 bank1WhoControlsLEDs "MIDI Messages Only"
 ```
 
-Then replug the DM2; the driver re-reads its settings when the device attaches. Section 6 shows how an app can apply settings without a replug.
+After a Terminal change, replug the DM2: the driver re-reads its settings when the device attaches. The settings app, and any app using section 6, applies changes without a replug.
 
 ---
 
@@ -219,23 +222,24 @@ The driver also listens for these other notification names, all using the same `
 |---|---|
 | `Preferences Changed` | re-read all settings |
 | `Clear All LEDs` | turn off every LED in every bank |
-| `Reset Calibration` | reset the slider and crossfader calibration |
+| `Reset Calibration` | reset the joystick and slider calibration |
 | `Reset Interface` | re-initialise the USB interface |
 
 ---
 
 ## 7. Other LED-related settings
 
-All of these use the `com.joemattiello.driver.dm2` domain. Replace `bank1` with `bank2`, `bank3` or `bank4` for the other banks, in banked mode.
+All of these can be set in the DM2 Settings app. They use the `com.joemattiello.driver.dm2` domain. Replace `bank1` with `bank2`, `bank3` or `bank4` for the other banks, in banked mode.
 
 | Key | Type | Effect |
 |---|---|---|
 | `softwareMode` | string | `Generic MIDI` (default, one bank; the 4 bottom buttons send notes), `Generic MIDI with Banks` (the 4 bottom buttons switch between banks 1 to 4), `Mixxx`, `Traktor` |
 | `bank1WhoControlsLEDs` | string | see section 2 |
 | `bank1StickyButtons` | bool | the driver makes every pad in the bank latch. A press alternates between sending Note On and Note Off, and the LED follows. This covers all pads or none; for a mix, use the app approach in section 4. |
-| `bank1InvertLeds` | bool | flips the meaning of on and off for the bank (banked modes) |
+| `bank1InvertLeds` | bool | flips the meaning of on and off for the bank: LEDs are lit when off |
 | `bank1DisplaysMIDIClock` | bool | the bank's LEDs show a running light driven by incoming MIDI clock; note messages to that bank are ignored |
-| `midiClockResolution` | string | `16th` (default), `1/4` or other values, for the MIDI clock display |
+| `bank1ScratchRingBumpIgnore` | int | 0 (off) to 10. Scratch ring movement at or below this speed sends nothing, so bumping a ring is ignored |
+| `midiClockResolution` | string | `16th` (default), `32nd`, or `1/4` (flash on quarter notes only), for the MIDI clock display |
 
 Example: `defaults write com.joemattiello.driver.dm2 bank1StickyButtons -bool true`
 
@@ -251,5 +255,6 @@ Example: `defaults write com.joemattiello.driver.dm2 bank1StickyButtons -bool tr
   - See `MIDI Driver/DM2USBMIDIDriver/DM2USBMIDI.cpp`: `sendLights` and `StartInterface`.
 - MIDI-in to LED handling: `DM2USBMIDI.cpp` `PrepareOutput` (note on/off parsing) and `Configurations/DM2Configuration.cpp` `buttonReceived` and `toggleLED` (note to LED mapping).
 - Pad to LED handling: `DM2USBMIDI.cpp` `HandleInput` and `DM2Configuration.cpp` `button*Clicked` / `makeBasicNote`.
-- Settings: `DM2USBMIDI.cpp` `readSettings`, `Configurations/DM2Configuration.cpp` and `Configurations/DM2BasicBanks.cpp` `readSettings`.
+- Settings: `DM2USBMIDI.cpp` `readSettings` (mode, clock), `Configurations/DM2Configuration.cpp` `readBankSettings` (per bank, all modes except Traktor, which reads none).
+- Settings app: `DM2 Settings/` (SwiftUI, `build.sh`). `Sources/DriverSettings.swift` is a complete reference for reading and writing every key.
 - Investigation history, and approaches that failed and must not be retried: `AGENT_NOTES.md`.

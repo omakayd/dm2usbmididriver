@@ -11,8 +11,7 @@
  Inherits all from DM2Configuration.
  
  Ignores switching of banks on bottom 1-4.
- Deletes banks created in DM2Configuration constructor.
- Overrides clearLEDAllBanks() and readSettings() to avoid crashing.
+ Uses bank1 only; clearLEDAllBanks() and readSettings() touch bank1 alone.
  
  */
 
@@ -30,11 +29,6 @@ class DM2BasicNoBanks : public DM2Configuration {
 public:
 	DM2BasicNoBanks();
 	
-	/* Extra Banks */
-	struct Bank * bank2;
-	struct Bank * bank3;
-	struct Bank * bank4;
-
 	/* Overridden methods */
 	void bottom1Clicked(DM2USBMIDIDriver * dm2);
 	void bottom2Clicked(DM2USBMIDIDriver * dm2);

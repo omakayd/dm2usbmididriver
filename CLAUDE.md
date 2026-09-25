@@ -13,13 +13,16 @@ A CoreMIDI driver for the **MixMan DM2** USB DJ controller, ported to build and 
   `AppleUSBHostMergeProperties` + `kUSBDescriptorOverride` to re-declare EP 0x02 as Interrupt. Requires SIP disabled.
   User-confirmed (5-blink at attach, pads toggle LEDs). Released as v1.1.0.
 - Random pads lit at attach: fixed (`haveBaseline` in DM2USBMIDI.cpp), user-confirmed.
-- MIDI-controlled LED mode (`bank<N>WhoControlsLEDs`): documented from code in LED_CONTROL.md, NOT yet hardware-tested.
+- MIDI-controlled LED mode (`bank<N>WhoControlsLEDs`): user-verified with FL Studio after the Note On/Off fix
+  (buttonReceived in DM2Configuration.cpp; LED bits are active-low).
+- DM2 Settings app (`DM2 Settings/`, SwiftUI, built by `build.sh`): user-tested. Writes the pref domain
+  `com.joemattiello.driver.dm2` and posts "Preferences Changed" so the driver re-reads live. Released as v1.2.0.
 - DriverKit version of the fix (`DM2 LED Fix/App`, `Driver`, `project.yml`): blocked, needs a PAID Apple team.
   Personal teams cannot get DriverKit / System Extension profiles, and AMFI kills it even with SIP off.
 
 ## Key facts
 
-- Language: C++, Obj-C
+- Language: C++, Obj-C (driver), Swift (settings app)
 - Repo: https://github.com/omakayd/dm2usbmididriver.git (PUBLIC, yours, omakayd; origin push OK after you test).
   Public repo: never commit names, team IDs, emails, or local paths.
 - DM2: low-speed USB, VID 0x0665, PID 0x0301. EP 0x81 interrupt IN (8-byte reports), EP 0x02 LED OUT (4-byte packets).

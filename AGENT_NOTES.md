@@ -1,5 +1,78 @@
 # AGENT_NOTES (newest first)
 
+## 2026-09-24 DM2 Settings app built; awaiting user test (then ship v1.2.0: app + driver fixes)
+
+- Source: `DM2 Settings/` = Sources/{DM2SettingsApp,DriverSettings,DeviceStatus}.swift, Info.plist (com.omakayd.DM2Settings,
+  1.2.0), build.sh (swiftc per arch, lipo, ad-hoc sign; `"DM2 Settings/build.sh"`). Universal, minos 11.0, sig OK.
+  Compiles against the macOS 11 target with no availability errors (swiftc enforces them).
+- Behaviour: writes only changed keys, with driver types; posts "Preferences Changed" (+ "Clear All LEDs" after mode or
+  invert change). Reload on app activate. Status: plugin/kext file presence, USB IOUSBHostDevice 0665:0301, CoreMIDI device
+  "DM2"/"MixMan" online. Creates a MIDI client so MIDIServer (and the driver) run while the app is open.
+- Verified: model round trip on a throwaway domain (com.omakayd.dm2settings.selftest, deleted after); offscreen
+  NSHostingView render at 600x658 (fits, no scroll). Popups needed .fixedSize() (frame(width:) centred them).
+  Screen capture of the live window is blocked (no Screen Recording permission for the terminal).
+- Test copies: "Test Build/DM2USBMIDIDriver.plugin" (includes readBankSettings etc.) + "Test Build/DM2 Settings.app".
+- Ship list after user OK: commit driver fixes + app + docs (README/LED_CONTROL mention app), release v1.2.0 zip with
+  plugin, kext, app, LED_CONTROL.md, README.md.
+
+## 2026-09-24 Settings app: user said build it; ship v1.2.0 (app + Note On/Off fix) ONLY after user confirms app
+
+Settings contract (domain com.joemattiello.driver.dm2), verified from driver + old pane nib:
+- softwareMode: "Generic MIDI" (default, bank1 only) | "Generic MIDI with Banks" (banks 1-4) | "Mixxx" (bank1 only,
+  MixxxConfiguration derives from DM2BasicNoBanks) | "Traktor" (TraktorConfiguration::readSettings is EMPTY: no setting applies).
+- bank<N>WhoControlsLEDs string: "Driver Only" | "MIDI Messages Only" | "Driver & MIDI Messages".
+- bank<N>StickyButtons, bank<N>InvertLeds, bank<N>DisplaysMIDIClock: CFBoolean.
+- bank<N>ScratchRingBumpIgnore: int 0..10 (pane popup index; 0 = Off). Used as `(accel - bumpIgnore) <= 0` ignore.
+- midiClockResolution: "16th" (default) | "32nd" | "1/4" (pane labels: 16th Notes, 32nd Notes, Flash on quarter note only).
+- Notifications (object = domain): "Preferences Changed" (driver re-reads live), "Clear All LEDs", "Reset Calibration",
+  "Reset Interface". Driver registers the observer in StartInterface, removes it in StopInterface.
+- CoreMIDI device name "DM2", manufacturer "MixMan".
+Driver bugs found (fixing now):
+1. DM2Configuration::readSettings reads WhoControlsLEDs for bank1 only; banks 2-4 never read.
+2. `new struct Bank` is default-init (POD): bank flags garbage until read.
+3. DM2USBMIDIDriver::readSettings: softwareMode = copied rtn (leaked), then rtn reused for midiClockResolution and
+   CFReleased at the end while still stored -> dangling pointer, used by PrepareOutput on MIDI clock (0xF8).
+4. CORRECTED: not a NULL crash. DM2BasicNoBanks declared its OWN bank2-4 members shadowing the base's, and its ctor
+   `delete`d those uninitialised shadows (UB; survived on zeroed heap). PrepareOutput uses the base banks (valid).
+FIXED (driver builds clean, untested on device): per-bank reader DM2Configuration::readBankSettings (all 4 banks,
+type-robust via CFPreferencesGetAppBoolean/IntegerValue, WhoControlsLEDs type-checked); `new struct Bank()`;
+shadow members + deletes removed (NoBanks readSettings = readBankSettings(bank1)); DM2USBMIDIDriver::readSettings
+maps prefs to constant CFSTRs via readChoice() (no leak, no dangling, thread-safe); ctor inits midiClockResolution.
+App: "DM2 Settings/" (SwiftUI, swiftc build.sh, universal, macOS 11), writes keys + posts notifications.
+
+## 2026-09-24 Settings UI: original PrefPane exists but is NOT built
+
+- `MIDI Driver/DM2 PrefPane/` (Joe Mattiello, 2007) is in the repo but not a target: xcodeproj has only DM2USBMIDIDriver.
+  2007-era: IB 677 nibs with Java EOArchive (IBOldestOS 5 = Tiger), Growl checkbox, updater to dead joemattiello.com,
+  registration fields, QCView (Quartz Composer, removed from macOS). Reviving it = rebuilding the UI anyway.
+- Keys it wrote (all in domain com.joemattiello.driver.dm2): softwareMode, bank1..4 WhoControlsLEDs / StickyButtons /
+  InvertLeds / DisplaysMIDIClock / ScratchRingBumpIgnore, midiClockResolution. Buttons post distributed notifications
+  "Preferences Changed", "Clear All LEDs", "Reset Calibration", "Reset Interface" (object appID). The driver's
+  notifyCallback re-reads settings on "Preferences Changed", so a new UI applies live without a replug.
+- Recommendation given to user: new small SwiftUI settings app (universal, macOS 11) writing the same keys. Awaiting choice.
+
+## 2026-09-24 BUG FIXED (user-confirmed "ok that's working"): MIDI Note On/Off drove LEDs backwards
+
+- User, after setting "MIDI Messages Only": LEDs respond but do not turn off on Note Off.
+- Cause (original driver bug): LED bits are active-low (DM2USBMIDI.h `#define ON FALSE`, `OFF TRUE`); ledStatus()
+  returns the raw bit, and buttonReceived compared it straight to onMessage. From cleared (raw TRUE): Note On matched
+  -> no-op; Note Off differed -> toggled ON; next Note On -> OFF. So pads lit on release and held until next press.
+- Fix DM2Configuration.cpp buttonReceived: isLit = invertLeds ? raw : !raw; toggle when onMessage != isLit
+  (same convention as setLED). Also `onMessage & value == 0` -> `&&` (worked only by precedence).
+  Applies to Generic + Mixxx (Mixxx calls the base); Traktor has its own path, untouched.
+- Rebuilt universal/minos 11.0/sig OK; copy in "Test Build/" (gitignored). Awaiting user install + retest.
+  v1.1.0 release ships the buggy behaviour; needs a v1.1.1 after the user confirms.
+
+## 2026-09-24 "LEDs ignore MIDI from FL Studio": setting, not a bug
+
+- Symptom: FL Studio playing back the DM2's own recorded notes to the DM2 destination lit nothing; pad presses did.
+- Cause: pref domain com.joemattiello.driver.dm2 did not exist, so bank1WhoControlsLEDs defaulted to "Driver Only"
+  (midiInControlsLeds=FALSE); DM2Configuration::buttonReceived (DM2Configuration.cpp:476) then ignores incoming notes.
+  Code path read end to end: USBMIDIDevice::DoWrite -> DM2USBMIDIDriver::PrepareOutput (note<64 -> bank = note/16,
+  led = note%16) -> buttonReceived -> sendLights. No code defect found.
+- Action: `defaults write com.joemattiello.driver.dm2 bank1WhoControlsLEDs -string "MIDI Messages Only"`.
+  Settings are read at attach (StartInterface) so the DM2 must be replugged. Awaiting user retest.
+
 ## 2026-09-24 v1.1.0 release (user asked: update docs, push, release)
 
 - IOServiceClient.cpp: IOMainPort only on macOS 12+ (`__builtin_available`), IOMasterPort on 11. Before this the

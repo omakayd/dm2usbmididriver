@@ -12,3 +12,18 @@ DerivedData/
 
 # Growl framework (removed dependency)
 MIDI Driver/External Libraries/Growl.framework/
+
+# dm2-led-probe build output and run reports
+build.noindex/
+Tools/dm2-led-probe/dm2-led-probe
+Tools/dm2-led-probe/probe-report-*.txt
+
+# Generated / local-only
+DM2 LED Fix/DM2 LED Fix.app/
+DM2 LED Fix/DM2LEDFix.xcodeproj/
+**/xcuserdata/
+MIDI Driver/DM2USBMIDIDriver.xcodeproj/project.xcworkspace/
+Releases/
+
+# Copyrighted reference material
+dm2_manual.pdf

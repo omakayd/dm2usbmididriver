@@ -1,0 +1,23 @@
+//
+//  DM2LEDFixDriver.iig
+//
+//  Placeholder user-space class. The real work is done by the kernel class
+//  AppleUSBHostMergeProperties, named in this dext's IOKitPersonalities: it
+//  merges a corrected configuration descriptor (kUSBDescriptorOverride) into
+//  the DM2's IOUSBHostDevice so the host stack builds EP 0x02 as an Interrupt
+//  pipe instead of rejecting the illegal low-speed Bulk endpoint.
+//
+
+#ifndef DM2LEDFixDriver_h
+#define DM2LEDFixDriver_h
+
+#include <Availability.h>
+#include <DriverKit/IOService.iig>
+
+class DM2LEDFixDriver: public IOService
+{
+public:
+    virtual kern_return_t Start(IOService * provider) override;
+};
+
+#endif /* DM2LEDFixDriver_h */

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>OSBundleUsageDescription</key>
+	<string>Corrects the Mixman DM2 USB descriptor so its LEDs can be driven on modern Macs.</string>
+	<key>IOKitPersonalities</key>
+	<dict>
+		<key>DM2 descriptor override</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleIdentifierKernel</key>
+			<string>com.apple.driver.AppleUSBHostMergeProperties</string>
+			<key>IOClass</key>
+			<string>AppleUSBHostMergeProperties</string>
+			<key>IOUserClass</key>
+			<string>DM2LEDFixDriver</string>
+			<key>IOUserServerName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>IOMatchCategory</key>
+			<string>DM2DescriptorOverride</string>
+			<key>IOProviderClass</key>
+			<string>IOUSBHostDevice</string>
+			<key>idVendor</key>
+			<integer>1637</integer>
+			<key>idProduct</key>
+			<integer>769</integer>
+			<key>IOProviderMergeProperties</key>
+			<dict>
+				<key>kUSBDescriptorOverride</key>
+				<dict>
+					<key>descriptor</key>
+					<data>CQIgAAEBAIAACQQAAAL///8ABwWBAwgACgcFAgMIAAo=</data>
+					<key>index</key>
+					<integer>0</integer>
+					<key>languageID</key>
+					<integer>0</integer>
+				</dict>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

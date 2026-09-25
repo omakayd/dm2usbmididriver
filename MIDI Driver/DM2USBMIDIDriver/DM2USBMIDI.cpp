@@ -61,13 +61,13 @@ Maybes::
 //using namespace std;
 
 // _________________________________________________________________________________________
-// dm2WriteLEDData — sends 4-byte LED packet to the DM2.
+// dm2WriteLEDData: sends 4-byte LED packet to the DM2.
 //
-// The DM2's OUT endpoint (addr=0x02) is incorrectly declared as Bulk (attr=0x02)
-// in the device descriptor, but the DM2 is a low-speed USB device. xHCI host
-// controllers (Apple Silicon) refuse to create bulk endpoints for low-speed devices
-// per the USB spec, so WritePipe fails with kIOUSBUnknownPipeErr on those systems.
-// LED output is unavailable on xHCI; MIDI input works normally.
+// The DM2's OUT endpoint (addr=0x02) is declared as Bulk (attr=0x02), which is illegal
+// on a low-speed USB device. Current macOS (IOUSBHostFamily descriptor validation)
+// refuses to create that pipe, so WritePipe fails with kIOUSBUnknownPipeErr unless the
+// DM2LEDFix.kext descriptor override is installed; it re-declares 0x02 as Interrupt.
+// See LED_CONTROL.md. Without the kext, LED output is unavailable; MIDI input still works.
 //
 static IOReturn dm2WriteLEDData(IOUSBInterfaceInterface **intf, void *buffer, UInt32 size)
 {
@@ -102,6 +102,9 @@ DM2USBMIDIDriver::DM2USBMIDIDriver() :
 	USBVendorMIDIDriver(kFactoryUUID)
 {
 		resetCalibration();
+		bzero(&status, sizeof(status));
+		bzero(&oldstatus, sizeof(oldstatus));
+		haveBaseline = false;
 		softwareMode = CFSTR("Generic MIDI");
 		
 		genericConfigWithBanks	= new DM2Configuration();
@@ -247,8 +250,13 @@ void		DM2USBMIDIDriver::StartInterface(USBMIDIDevice *usbmDev)
 	if (intf == NULL || *intf == NULL)
 		return;
 
-	// Blink LEDs on startup (may fail silently on xHCI/Apple Silicon
-	// due to the DM2's spec-violating bulk endpoint on a low-speed device)
+	// Fresh attach: forget the previous device's button state (see HandleInput)
+	bzero(&status, sizeof(status));
+	bzero(&oldstatus, sizeof(oldstatus));
+	haveBaseline = false;
+
+	// Blink LEDs on startup (fails silently when the DM2LEDFix.kext
+	// descriptor override is not installed; see dm2WriteLEDData)
 	for(int x = 0; x<5;x++)
 	{
 		bzero(buffer, sizeof(buffer));
@@ -314,6 +322,20 @@ void		DM2USBMIDIDriver::HandleInput(USBMIDIDevice *usbmDev, MIDITimeStamp when, 
 	if(readBufSize == 8)								// If buffer was of size 8, then update the status, except for the jog discs
 	{	
 		memcpy( &(((Byte *)(&status )) )[2] , readBuf,8);
+
+		/* The first report after attach is not a button change. It can be the DM2 echoing its own
+		   VID/PID (65 06 01 03 ...), which would otherwise read as presses and toggle a random set of
+		   LEDs. Skip that echo, then store the first real report as the baseline without acting on it. */
+		if (!haveBaseline)
+		{
+			if (readBuf[0] == 0x65 && readBuf[1] == 0x06 && readBuf[2] == 0x01 && readBuf[3] == 0x03)
+				return;
+			if (status.slider == 0)	// still initialising, same rule as below
+				return;
+			memcpy( &oldstatus, &status, sizeof( struct dm_status ));
+			haveBaseline = true;
+			return;
+		}
 
 		if ( memcmp(&status,&oldstatus,sizeof(struct dm_status)) == 0 || status.slider == 0)		
 			// Check if there's even been a change, we can save some time and just return now if there isn't.

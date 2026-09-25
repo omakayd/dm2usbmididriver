@@ -83,7 +83,8 @@ public:
 	
 	dm_status status;
 	dm_status oldstatus;
-	
+	bool haveBaseline;	// false until the first real button report after attach has been stored in oldstatus
+
 	USBMIDIDevice *GusbmDev;
 	
 	void printf_dm2();

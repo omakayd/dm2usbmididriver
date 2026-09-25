@@ -13,31 +13,60 @@ This project is a port of [joematt/dm2usbmididriver](https://github.com/joematt/
 ## Features
 
 - Full MIDI input from all DM2 controls: buttons, jog wheels, joystick, and slider
+- LED output on current macOS, including Apple Silicon (needs the one-time LED fix below)
+- LEDs can be driven by the driver, by MIDI from your own app, or both (see [LED_CONTROL.md](LED_CONTROL.md))
 - Multiple configuration modes (Generic, Traktor, Mixxx)
 - Bank switching for expanded MIDI mappings
 - Joystick auto-calibration
-- Builds as Universal Binary (Apple Silicon + Intel)
+- Universal Binary (Apple Silicon + Intel), macOS 11.0 or later
 
-## Known Limitations
+## LED output on modern macOS
 
-**LED output does not work on Apple Silicon Macs.** The DM2 firmware declares its LED output endpoint as USB Bulk, but the device is low-speed USB (1.5 Mb/s). The USB spec prohibits bulk transfers on low-speed devices, and the xHCI controller on Apple Silicon correctly rejects them. Linux and Windows work around this at the kernel level, but no user-space macOS workaround exists. MIDI input is fully functional regardless.
+The DM2 firmware declares its LED output endpoint (0x02) as USB Bulk, but the device is low-speed USB (1.5 Mb/s), where Bulk endpoints are not allowed. Current macOS rejects that endpoint in software (`IOUSBHostFamily::validateEndpointMaxPacketSize ... endpoint 0x02 invalid wMaxPacketSize`), so without help the LED pipe is never created. MIDI input works either way.
+
+`DM2 LED Fix/Kext/DM2LEDFix.kext` fixes this. It is a codeless kernel extension (a settings file, no program code) that uses Apple's own `AppleUSBHostMergeProperties` class and `kUSBDescriptorOverride` to give macOS a corrected descriptor with endpoint 0x02 declared as Interrupt, which is legal at low speed and works the same for the DM2.
+
+**It requires System Integrity Protection (SIP) to be disabled**, because only Apple can issue the certificate that signs kexts for loading with SIP on. Full steps, verification, and uninstall are in [LED_CONTROL.md](LED_CONTROL.md#1-enabling-leds-on-a-modern-mac-one-time-setup).
+
+`DM2 LED Fix/` also contains a DriverKit version of the same fix (host app plus dext) that would work with SIP on. It is unused because building it needs a paid Apple Developer team with DriverKit entitlements; see [AGENT_NOTES.md](AGENT_NOTES.md) for details.
 
 ## Building
 
-1. Open `MIDI Driver/DM2USBMIDIDriver.xcodeproj` in Xcode 16+
-2. Build (Cmd+B) — produces a Universal Binary `.plugin` bundle
+From the command line (universal, macOS 11.0 minimum):
+
+```
+cd "MIDI Driver"
+xcodebuild -project DM2USBMIDIDriver.xcodeproj -target DM2USBMIDIDriver -configuration Release \
+  SYMROOT="$PWD/build.noindex" OBJROOT="$PWD/build.noindex/obj" \
+  ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO MACOSX_DEPLOYMENT_TARGET=11.0 build
+```
+
+The plugin is written to `MIDI Driver/build.noindex/Release/DM2USBMIDIDriver.plugin`. Opening the project in Xcode and building also works.
 
 ## Installation
 
-1. Copy the built plugin to the MIDI Drivers directory:
+Prebuilt copies of the driver and the LED fix are attached to each [GitHub release](https://github.com/omakayd/dm2usbmididriver/releases).
+
+1. Copy the plugin to the MIDI Drivers directory:
    ```
-   sudo cp -R "build/Release/DM2USBMIDIDriver.plugin" "/Library/Audio/MIDI Drivers/"
+   sudo cp -R DM2USBMIDIDriver.plugin "/Library/Audio/MIDI Drivers/"
    ```
 2. Restart the MIDI server:
    ```
    sudo killall MIDIServer
    ```
-3. Plug in the DM2 — it should appear in Audio MIDI Setup.app
+3. For LEDs, install `DM2LEDFix.kext` as described in [LED_CONTROL.md](LED_CONTROL.md#1-enabling-leds-on-a-modern-mac-one-time-setup).
+4. Open a MIDI app (for example Audio MIDI Setup) and plug in the DM2. It appears as a MIDI device, and with the LED fix installed the LEDs blink 5 times at attach.
+
+The driver runs inside `MIDIServer`, which macOS starts only while a MIDI app is open. With no MIDI app running, the DM2 is not configured and the LEDs stay dark.
+
+## Controlling the LEDs from your own app
+
+By default the driver toggles each pad's LED when the pad is pressed. The `bank<N>WhoControlsLEDs` setting hands the LEDs to MIDI instead: send Note On to light a pad and Note Off to clear it, on the same note number the pad sends. That lets an app show latching and momentary pads differently, mirror its own state, and so on. [LED_CONTROL.md](LED_CONTROL.md) has the full protocol, note table, a Swift example, and how to change the settings from code.
+
+## Diagnostics
+
+`Tools/dm2-led-probe/` is a command-line probe that reports what macOS does with the DM2's endpoints and tries every LED write path. Run `sudo Tools/dm2-led-probe/run_probe.sh --capture` with the DM2 plugged in; see its [README](Tools/dm2-led-probe/README.md).
 
 ## Project Structure
 
@@ -60,6 +89,12 @@ MIDI Driver/
     CAMutex.h                  # pthread_mutex RAII wrapper
     CAHostTimeBase.h           # mach_absolute_time utilities
   DM2USBMIDIDriver.xcodeproj   # Xcode project
+DM2 LED Fix/
+  Kext/DM2LEDFix.kext          # Codeless kext: descriptor override that enables the LEDs
+  App/, Driver/, project.yml   # DriverKit version of the same fix (needs a paid team)
+Tools/dm2-led-probe/           # USB endpoint diagnostic tool
+LED_CONTROL.md                 # LED setup and app control guide
+AGENT_NOTES.md                 # Development log and findings
 ```
 
 ## Changes from Original
@@ -67,7 +102,7 @@ MIDI Driver/
 - Removed Growl framework dependency (notifications)
 - Replaced `Carbon/Carbon.h` and `CoreServices/CoreServices.h` with `CoreFoundation/CoreFoundation.h`
 - Removed x86-only `__attribute__((fastcall))`
-- Replaced deprecated `IOMasterPort` with `IOMainPort`
+- Uses `IOMainPort` on macOS 12+ and `IOMasterPort` on macOS 11
 - Replaced deprecated `NSLookupAndBindSymbolWithHint` with `dlsym`
 - Added `CAMutex.h` and `CAHostTimeBase.h` (minimal replacements for Apple CoreAudio utility classes)
 - Fixed `USBInterface::Open()` missing `mIsOpen = true` assignment
@@ -76,6 +111,8 @@ MIDI Driver/
 - Fixed `strlen()` on binary LED buffers (changed to fixed size `4`)
 - Fixed char narrowing warnings
 - Added null guards for robustness
+- LED state is cleared at attach, and the first input report is used as a baseline, so pads no longer come up randomly lit
+- Added the `DM2LEDFix.kext` descriptor override that makes the LED endpoint usable on current macOS
 
 ## Credits
 

@@ -1,0 +1,46 @@
+name: DM2LEDFix
+options:
+  deploymentTarget:
+    macOS: "11.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: ""   # set to a PAID team ID; Personal teams cannot sign DriverKit or System Extensions
+    CODE_SIGN_STYLE: Automatic
+    ARCHS: "arm64 x86_64"
+    ONLY_ACTIVE_ARCH: NO
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  DM2LEDFix:
+    type: application
+    platform: macOS
+    sources: [App]
+    settings:
+      base:
+        PRODUCT_NAME: DM2 LED Fix
+        PRODUCT_BUNDLE_IDENTIFIER: com.omakayd.DM2LEDFix
+        CODE_SIGN_ENTITLEMENTS: App/App.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        SWIFT_VERSION: "5.0"
+    dependencies:
+      - target: DM2LEDFixDriver
+        embed: true
+  DM2LEDFixDriver:
+    type: driver-extension
+    platform: macOS
+    sources:
+      - path: Driver
+        excludes: [Info.plist, Driver.entitlements]
+    settings:
+      base:
+        SDKROOT: driverkit
+        DRIVERKIT_DEPLOYMENT_TARGET: "20.0"
+        PRODUCT_NAME: com.omakayd.DM2LEDFix.Driver
+        PRODUCT_BUNDLE_IDENTIFIER: com.omakayd.DM2LEDFix.Driver
+        INFOPLIST_FILE: Driver/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Driver/Driver.entitlements
+        ARCHS: "arm64 x86_64"
+        RUN_CLANG_STATIC_ANALYZER: NO

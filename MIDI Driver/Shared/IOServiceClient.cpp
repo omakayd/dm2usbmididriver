@@ -66,7 +66,15 @@ IOServiceClient::IOServiceClient(CFRunLoopRef notifyRunLoop, CFMutableDictionary
 
 	// This gets the master device mach port through which all messages
 	// to the kernel go, and initiates communication with IOKit.
-	require_noerr(IOMainPort(MACH_PORT_NULL, &mMasterDevicePort), errexit);
+	// IOMainPort is macOS 12+; IOMasterPort is the same call on macOS 11.
+	if (__builtin_available(macOS 12.0, *)) {
+		require_noerr(IOMainPort(MACH_PORT_NULL, &mMasterDevicePort), errexit);
+	} else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+		require_noerr(IOMasterPort(MACH_PORT_NULL, &mMasterDevicePort), errexit);
+#pragma clang diagnostic pop
+	}
 	
 	if (mRunLoop) {
 		mNotifyPort = IONotificationPortCreate(mMasterDevicePort);
